@@ -34,33 +34,15 @@ if errorlevel 1 (
 )
 echo [OK] Python 依赖已安装
 
-:: 配置 MCP
+:: 配置 MCP（使用 Python 脚本安全合并配置，不会覆盖已有的其他 MCP 配置）
 echo.
 echo [3/5] 配置 MCP...
-
-:: 获取当前目录路径（转换斜杠）
-set "SCRIPT_DIR=%~dp0"
-set "SCRIPT_DIR=%SCRIPT_DIR:\=/%"
-set "SERVER_PATH=%SCRIPT_DIR%mcp-server-python/server.py"
-
-:: 正确的 Windsurf MCP 配置路径
-set "WINDSURF_MCP_DIR=%USERPROFILE%\.codeium\windsurf"
-set "WINDSURF_MCP_FILE=%WINDSURF_MCP_DIR%\mcp_config.json"
-
-:: 创建目录（如果不存在）
-if not exist "%WINDSURF_MCP_DIR%" mkdir "%WINDSURF_MCP_DIR%"
-
-:: 写入 MCP 配置
-echo {> "%WINDSURF_MCP_FILE%"
-echo   "mcpServers": {>> "%WINDSURF_MCP_FILE%"
-echo     "ask-continue": {>> "%WINDSURF_MCP_FILE%"
-echo       "command": "python",>> "%WINDSURF_MCP_FILE%"
-echo       "args": ["%SERVER_PATH%"]>> "%WINDSURF_MCP_FILE%"
-echo     }>> "%WINDSURF_MCP_FILE%"
-echo   }>> "%WINDSURF_MCP_FILE%"
-echo }>> "%WINDSURF_MCP_FILE%"
-
-echo [OK] MCP 配置已写入: %WINDSURF_MCP_FILE%
+python "%~dp0mcp-server-python\install_mcp_config.py"
+if errorlevel 1 (
+    echo [错误] MCP 配置失败
+    pause
+    exit /b 1
+)
 
 :: 安装 VS Code 扩展
 echo.
