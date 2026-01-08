@@ -14,10 +14,10 @@
 [![Go](https://img.shields.io/badge/go-1.21+-00ADD8.svg)](https://go.dev)
 
 <p align="center">
-  <strong>🔥 突破 Token 限制 | 🖼️ 图片解析 | � 多文件识别 | 🌍 跨平台支持</strong>
+  <strong>突破 Token 限制 | 图片解析 | 多文件识别 | 跨平台支持</strong>
 </p>
 
-> ⚠️ **仅支持 Windsurf IDE**，不支持 VS Code、Cursor 等其他编辑器
+> **仅支持 Windsurf IDE**，不支持 VS Code、Cursor 等其他编辑器
 
 </div>
 
