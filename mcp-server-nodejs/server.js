@@ -1,3 +1,14 @@
+// ==================================================
+// Ask-Continue MCP Server v2.0.0
+// ==================================================
+// 作者：传康KK
+// 微信：1837620622
+// 邮箱：2040168455@qq.com
+// 咸鱼/B站：万能程序员
+// ==================================================
+// 公告：使用 JS 绕过 MCP 限制，实现图片解析、多文件识别等功能
+// ==================================================
+
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
@@ -19,7 +30,46 @@ const IMAGE_EXTENSIONS = {
   '.gif': 'image/gif',
   '.webp': 'image/webp',
   '.bmp': 'image/bmp',
-  '.svg': 'image/svg+xml'
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+  '.tiff': 'image/tiff',
+  '.heic': 'image/heic',
+  '.heif': 'image/heif'
+};
+
+// --------------------------------------------------
+// 支持的文档格式及其 MIME 类型映射
+// --------------------------------------------------
+const DOCUMENT_EXTENSIONS = {
+  '.pdf': 'application/pdf',
+  '.doc': 'application/msword',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.xls': 'application/vnd.ms-excel',
+  '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  '.ppt': 'application/vnd.ms-powerpoint',
+  '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  '.txt': 'text/plain',
+  '.md': 'text/markdown',
+  '.json': 'application/json',
+  '.xml': 'application/xml',
+  '.csv': 'text/csv',
+  '.html': 'text/html',
+  '.css': 'text/css',
+  '.js': 'text/javascript',
+  '.ts': 'text/typescript',
+  '.py': 'text/x-python',
+  '.java': 'text/x-java',
+  '.c': 'text/x-c',
+  '.cpp': 'text/x-c++',
+  '.h': 'text/x-c',
+  '.yaml': 'text/yaml',
+  '.yml': 'text/yaml',
+  '.log': 'text/plain',
+  '.sh': 'text/x-shellscript',
+  '.bat': 'text/x-batch',
+  '.sql': 'text/x-sql',
+  '.r': 'text/x-r',
+  '.m': 'text/x-matlab'
 };
 
 // --------------------------------------------------
@@ -34,8 +84,16 @@ function readFileAsBase64(filePath) {
     const buffer = fs.readFileSync(absolutePath);
     const base64 = buffer.toString('base64');
     const ext = path.extname(absolutePath).toLowerCase();
-    const mimeType = IMAGE_EXTENSIONS[ext] || 'application/octet-stream';
-    return { base64, mimeType, fileName: path.basename(absolutePath), size: buffer.length };
+    const mimeType = IMAGE_EXTENSIONS[ext] || DOCUMENT_EXTENSIONS[ext] || 'application/octet-stream';
+    // dataUri 用于扩展预览，base64 用于 MCP 返回
+    const dataUri = `data:${mimeType};base64,${base64}`;
+    return { 
+      base64,      // 纯 base64 数据，用于 MCP SDK ImageContent
+      dataUri,     // 带前缀的 data URI，用于扩展预览
+      mimeType, 
+      fileName: path.basename(absolutePath), 
+      size: buffer.length 
+    };
   } catch (e) {
     return { error: `读取文件失败: ${e.message}` };
   }
@@ -47,6 +105,53 @@ function readFileAsBase64(filePath) {
 function isImageFile(filePath) {
   const ext = path.extname(filePath).toLowerCase();
   return ext in IMAGE_EXTENSIONS;
+}
+
+// --------------------------------------------------
+// 辅助函数：判断文件是否为文档
+// --------------------------------------------------
+function isDocumentFile(filePath) {
+  const ext = path.extname(filePath).toLowerCase();
+  return ext in DOCUMENT_EXTENSIONS;
+}
+
+// --------------------------------------------------
+// 辅助函数：获取文件类型描述
+// --------------------------------------------------
+function getFileTypeDescription(filePath) {
+  const ext = path.extname(filePath).toLowerCase();
+  const typeMap = {
+    '.pdf': 'PDF 文档',
+    '.doc': 'Word 文档',
+    '.docx': 'Word 文档',
+    '.xls': 'Excel 表格',
+    '.xlsx': 'Excel 表格',
+    '.ppt': 'PPT 演示文稿',
+    '.pptx': 'PPT 演示文稿',
+    '.txt': '文本文件',
+    '.md': 'Markdown 文档',
+    '.json': 'JSON 数据',
+    '.xml': 'XML 数据',
+    '.csv': 'CSV 表格',
+    '.html': 'HTML 网页',
+    '.css': 'CSS 样式',
+    '.js': 'JavaScript 代码',
+    '.ts': 'TypeScript 代码',
+    '.py': 'Python 代码',
+    '.java': 'Java 代码',
+    '.c': 'C 代码',
+    '.cpp': 'C++ 代码',
+    '.h': 'C/C++ 头文件',
+    '.yaml': 'YAML 配置',
+    '.yml': 'YAML 配置',
+    '.log': '日志文件',
+    '.sh': 'Shell 脚本',
+    '.bat': 'Batch 脚本',
+    '.sql': 'SQL 脚本',
+    '.r': 'R 代码',
+    '.m': 'Matlab 代码'
+  };
+  return typeMap[ext] || '未知文件';
 }
 
 // --------------------------------------------------
@@ -72,34 +177,77 @@ function getFileInfo(filePath) {
     const fileName = path.basename(absolutePath);
     
     if (isImageFile(absolutePath)) {
-      // 图片文件：返回 base64 数据
+      // 图片文件：返回 base64 数据和 dataUri
       const buffer = fs.readFileSync(absolutePath);
+      const base64 = buffer.toString('base64');
+      const mimeType = IMAGE_EXTENSIONS[ext];
       return {
         filePath: absolutePath,
         fileName,
         type: 'image',
-        mimeType: IMAGE_EXTENSIONS[ext],
+        mimeType,
         size: stats.size,
-        base64: buffer.toString('base64')
+        base64,
+        dataUri: `data:${mimeType};base64,${base64}`
       };
-    } else {
-      // 文本文件：读取内容（限制大小）
-      const maxSize = 1024 * 100; // 最大 100KB
-      if (stats.size > maxSize) {
+    } else if (isDocumentFile(absolutePath)) {
+      // 文档文件：返回 base64 数据（PDF、Word 等二进制文件）
+      const buffer = fs.readFileSync(absolutePath);
+      const base64 = buffer.toString('base64');
+      const mimeType = DOCUMENT_EXTENSIONS[ext];
+      const isBinary = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx'].includes(ext);
+      
+      if (isBinary) {
+        return {
+          filePath: absolutePath,
+          fileName,
+          type: 'document',
+          mimeType,
+          size: stats.size,
+          base64,
+          dataUri: `data:${mimeType};base64,${base64}`,
+          typeDescription: getFileTypeDescription(absolutePath)
+        };
+      } else {
+        // 文本类文档：读取内容
+        const maxSize = 1024 * 100;
+        let content = '';
+        try {
+          content = fs.readFileSync(absolutePath, 'utf-8');
+          if (content.length > maxSize) {
+            content = `[文件过大，仅显示前 ${maxSize} 字节]\n` + content.slice(0, maxSize);
+          }
+        } catch {
+          content = '[无法读取文件内容]';
+        }
         return {
           filePath: absolutePath,
           fileName,
           type: 'text',
+          mimeType,
           size: stats.size,
-          content: `[文件过大，仅显示前 ${maxSize} 字节]\n` + fs.readFileSync(absolutePath, 'utf-8').slice(0, maxSize)
+          content,
+          typeDescription: getFileTypeDescription(absolutePath)
         };
+      }
+    } else {
+      // 其他文件：尝试作为文本读取
+      const maxSize = 1024 * 100;
+      let content = '';
+      try {
+        content = fs.readFileSync(absolutePath, 'utf-8');
+        if (content.length > maxSize) {
+          content = `[文件过大，仅显示前 ${maxSize} 字节]\n` + content.slice(0, maxSize);
+        }
+      } catch {
+        content = '[无法读取文件内容，可能是二进制文件]';
       }
       return {
         filePath: absolutePath,
         fileName,
         type: 'text',
         size: stats.size,
-        content: fs.readFileSync(absolutePath, 'utf-8')
+        content
       };
     }
   } catch (e) {
@@ -201,7 +349,7 @@ function waitForResponse(requestId, timeout) {
 }
 
 const server = new Server(
-  { name: 'ask-continue', version: '1.0.0' },
+  { name: 'ask-continue', version: '2.0.0' },
   { capabilities: { tools: {} } }
 );
 
@@ -327,6 +475,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
       imageData = {
         base64: result.base64,
+        dataUri: result.dataUri,
         mimeType: result.mimeType,
         fileName: result.fileName,
         size: result.size
@@ -334,9 +483,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     } 
     // 使用 base64 数据
     else if (args.imageBase64) {
+      const mimeType = args.mimeType || 'image/png';
       imageData = {
         base64: args.imageBase64,
-        mimeType: args.mimeType || 'image/png',
+        dataUri: `data:${mimeType};base64,${args.imageBase64}`,
+        mimeType: mimeType,
         fileName: 'uploaded_image',
         size: Buffer.from(args.imageBase64, 'base64').length
       };
