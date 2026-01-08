@@ -1,19 +1,20 @@
 <div align="center">
 
-# 🚀 Windsurf 对话增强工具
+# 🚀 Windsurf 对话增强工具 v2.0.0
 
 ![项目主图](test1.png)
 
-### Windsurf Dialogue+ - 让 AI 对话永不结束
+### 使用 JS 绕过 MCP 限制 - 让 AI 对话永不结束
 
-[![Version](https://img.shields.io/badge/version-1.3.2-blue.svg)](https://github.com/1837620622/Windsurf_Ask_Continue)
+[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com/1837620622/Windsurf_Ask_Continue)
 [![License](https://img.shields.io/badge/license-CC%20BY--NC--SA%204.0-green.svg)](./LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windsurf%20IDE-purple.svg)](https://windsurf.ai)
+[![Node.js](https://img.shields.io/badge/node.js-18+-339933.svg)](https://nodejs.org)
 [![Python](https://img.shields.io/badge/python-3.10+-yellow.svg)](https://python.org)
 [![Go](https://img.shields.io/badge/go-1.21+-00ADD8.svg)](https://go.dev)
 
 <p align="center">
-  <strong>🔥 突破 Token 限制 | 📎 多文件上传 | 🌍 跨平台支持</strong>
+  <strong>🔥 突破 Token 限制 | 🖼️ 图片解析 | � 多文件识别 | 🌍 跨平台支持</strong>
 </p>
 
 > ⚠️ **仅支持 Windsurf IDE**，不支持 VS Code、Cursor 等其他编辑器
@@ -70,6 +71,16 @@
 <td align="center">🔄</td>
 <td><strong>无限对话</strong></td>
 <td>AI 完成任务后自动弹窗询问是否继续，突破单次对话限制</td>
+</tr>
+<tr>
+<td align="center">🖼️</td>
+<td><strong>图片解析 (v2.0 新增)</strong></td>
+<td>支持本地图片路径或 base64 数据，可用于 OCR 文字提取、图表分析</td>
+</tr>
+<tr>
+<td align="center">📂</td>
+<td><strong>多文件识别 (v2.0 新增)</strong></td>
+<td>批量分析多个文件，支持图片和文本文件混合处理，代码审查、文档分析</td>
 </tr>
 <tr>
 <td align="center">📎</td>
@@ -370,6 +381,13 @@ pip install -r requirements.txt
 
 ## 📝 更新日志
 
+### v2.0.0 (2025-01-08) 🎉 重大更新
+- 🖼️ **图片解析** - 新增 `analyze_image` 工具，支持本地图片路径或 base64 数据
+- 📂 **多文件识别** - 新增 `analyze_files` 工具，批量分析图片和文本文件
+- 🚀 **JS 绕过 MCP** - 使用 Node.js 实现，突破 MCP 原有限制
+- 🎨 **支持格式** - jpg/jpeg/png/gif/webp/bmp/svg 图片格式
+- 📊 **智能统计** - 自动区分图片和文本文件，显示文件大小
+
 ### v1.3.2 (2025-12-21)
 - 🔧 **连接优化** - 改进重启服务和重新打开窗口的稳定性
 - 🐍 **Python 优先** - 智能启动器改为 Python 优先（图片预览更好）
@@ -421,7 +439,10 @@ pip install -r requirements.txt
 ├── uninstall.sh             # 卸载脚本（Mac/Linux）
 ├── .github/workflows/       # GitHub Actions 自动化
 │   └── build-go.yml         # 自动编译 Go 多平台版本
-├── mcp-server-go/           # MCP 服务器（Go 版本，推荐）
+├── mcp-server-nodejs/       # MCP 服务器（Node.js 版本，v2.0 新增）⭐
+│   ├── server.js            # 主程序（含图片解析、多文件识别）
+│   └── package.json         # Node.js 依赖
+├── mcp-server-go/           # MCP 服务器（Go 版本）
 │   ├── server.go            # 主程序
 │   ├── ask-continue-mcp     # 编译后的可执行文件
 │   └── mcp-launcher.sh      # 智能启动器脚本
