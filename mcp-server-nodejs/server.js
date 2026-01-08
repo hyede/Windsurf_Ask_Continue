@@ -209,13 +209,13 @@ function getFileInfo(filePath) {
           typeDescription: getFileTypeDescription(absolutePath)
         };
       } else {
-        // 文本类文档：读取内容
-        const maxSize = 1024 * 100;
+        // 文本类文档：读取内容（限制 10MB，避免内存溢出）
+        const maxSize = 1024 * 1024 * 10; // 10MB
         let content = '';
         try {
           content = fs.readFileSync(absolutePath, 'utf-8');
           if (content.length > maxSize) {
-            content = `[文件过大，仅显示前 ${maxSize} 字节]\n` + content.slice(0, maxSize);
+            content = `[文件过大 (${formatFileSize(stats.size)})，仅显示前 10MB]\n` + content.slice(0, maxSize);
           }
         } catch {
           content = '[无法读取文件内容]';
@@ -231,13 +231,13 @@ function getFileInfo(filePath) {
         };
       }
     } else {
-      // 其他文件：尝试作为文本读取
-      const maxSize = 1024 * 100;
+      // 其他文件：尝试作为文本读取（限制 10MB）
+      const maxSize = 1024 * 1024 * 10; // 10MB
       let content = '';
       try {
         content = fs.readFileSync(absolutePath, 'utf-8');
         if (content.length > maxSize) {
-          content = `[文件过大，仅显示前 ${maxSize} 字节]\n` + content.slice(0, maxSize);
+          content = `[文件过大 (${formatFileSize(stats.size)})，仅显示前 10MB]\n` + content.slice(0, maxSize);
         }
       } catch {
         content = '[无法读取文件内容，可能是二进制文件]';
