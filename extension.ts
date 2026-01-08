@@ -203,11 +203,30 @@ class StatusViewProvider implements vscode.WebviewViewProvider {
 /**
  * Send response back to MCP server
  */
+interface ImageData {
+  name: string;
+  base64: string;
+  mimeType: string;
+  size?: number;
+}
+
+interface FileData {
+  name: string;
+  path?: string;
+  base64?: string;
+  mimeType?: string;
+  size?: number;
+  content?: string;
+  isImage: boolean;
+}
+
 async function sendResponseToMCP(
   requestId: string,
   userInput: string,
   cancelled: boolean,
-  callbackPort?: number
+  callbackPort?: number,
+  images?: ImageData[],
+  files?: FileData[]
 ): Promise<void> {
   const port = callbackPort || MCP_CALLBACK_PORT;
   return new Promise((resolve, reject) => {
@@ -215,6 +234,8 @@ async function sendResponseToMCP(
       requestId,
       userInput,
       cancelled,
+      images: images || [],
+      files: files || [],
     });
 
     const req = http.request(
@@ -297,23 +318,71 @@ async function showAskContinueDialog(request: AskRequest): Promise<void> {
             lastPendingRequest = null; // 清除待处理请求
             let finalText = message.text;
             
-            // 处理图片：附加 base64 数据（仅在非"仅路径"模式）
+            // 准备图片数据数组（用于 MCP 返回）
+            let imageDataArray: ImageData[] = [];
+            
+            // 处理图片：提取 base64 数据（仅在非"仅路径"模式）
             if (message.images && message.images.length > 0 && message.uploadType !== 'path') {
-              const imagesData = message.images.map((img: any, i: number) => 
-                '[图片 ' + (i + 1) + ': ' + img.name + ']\n' + img.base64
-              ).join('\n\n');
-              finalText = finalText + '\n\n' + imagesData;
+              imageDataArray = message.images.map((img: any) => {
+                // 从 data URI 中提取纯 base64 数据
+                let base64Data = img.base64 || '';
+                let mimeType = 'image/png';
+                if (base64Data.startsWith('data:')) {
+                  const match = base64Data.match(/^data:([^;]+);base64,(.+)$/);
+                  if (match) {
+                    mimeType = match[1];
+                    base64Data = match[2];
+                  }
+                }
+                return {
+                  name: img.name || 'image.png',
+                  base64: base64Data,
+                  mimeType: mimeType,
+                  size: img.size || 0
+                };
+              });
+              // 在文本中添加图片标记
+              const imagesText = message.images.map((img: any, i: number) => 
+                '[已上传图片 ' + (i + 1) + ': ' + img.name + ']'
+              ).join('\n');
+              if (imagesText) {
+                finalText = finalText ? finalText + '\n\n' + imagesText : imagesText;
+              }
             }
             
-            // 处理非图片文件：附加文件路径信息
+            // 处理非图片文件：提取文件数据
+            let fileDataArray: FileData[] = [];
             if (message.files && message.files.length > 0) {
-              const filesData = message.files.map((f: any, i: number) => 
-                '[文件 ' + (i + 1) + ': ' + f.name + ']' + (f.path ? '\n路径: ' + f.path : '')
-              ).join('\n\n');
-              finalText = finalText + '\n\n' + filesData;
+              fileDataArray = message.files.map((f: any) => {
+                // 从 data URI 中提取纯 base64 数据
+                let base64Data = f.base64 || '';
+                let mimeType = f.type || 'application/octet-stream';
+                if (base64Data.startsWith('data:')) {
+                  const match = base64Data.match(/^data:([^;]+);base64,(.+)$/);
+                  if (match) {
+                    mimeType = match[1];
+                    base64Data = match[2];
+                  }
+                }
+                return {
+                  name: f.name || 'file',
+                  path: f.path,
+                  base64: base64Data,
+                  mimeType: mimeType,
+                  size: f.size || 0,
+                  isImage: false
+                };
+              });
+              // 在文本中添加文件标记
+              const filesText = message.files.map((f: any, i: number) => 
+                '[已上传文件 ' + (i + 1) + ': ' + f.name + ']' + (f.path ? ' 路径: ' + f.path : '')
+              ).join('\n');
+              if (filesText) {
+                finalText = finalText ? finalText + '\n\n' + filesText : filesText;
+              }
             }
             
-            await sendResponseToMCP(request.requestId, finalText, false, request.callbackPort);
+            await sendResponseToMCP(request.requestId, finalText, false, request.callbackPort, imageDataArray, fileDataArray);
             panel.dispose();
           } catch (error) {
             responseSent = false;
@@ -998,10 +1067,10 @@ function getWebviewContent(reason: string, requestId: string): string {
     <div class="reason-card">
       <div class="reason-header">
         <span class="reason-icon">📢</span>
-        <span class="reason-label" data-zh="公告 · v1.3.2" data-en="Announcement · v1.3.2">公告 · v1.3.2</span>
+        <span class="reason-label" data-zh="公告 · v2.0.0" data-en="Announcement · v2.0.0">公告 · v2.0.0</span>
       </div>
       <div class="reason-text">
-        <div data-zh="🔧 连接优化 | 🐍 Python优先 | ⏰ 超时延长 | 🧹 进程清理" data-en="🔧 Connection Fix | 🐍 Python First | ⏰ Timeout Extended | 🧹 Process Cleanup">🔧 连接优化 | 🐍 Python优先 | ⏰ 超时延长 | 🧹 进程清理</div>
+        <div data-zh="�️ 图片传输 | � 多文件支持 | 🔄 MCP协议优化 | ✨ 全新架构" data-en="�️ Image Transfer | � Multi-file Support | 🔄 MCP Protocol | ✨ New Architecture">�️ 图片传输 | � 多文件支持 | 🔄 MCP协议优化 | ✨ 全新架构</div>
         <div style="margin-top: 8px; font-size: 12px; color: #6b7280;" data-zh="GitHub: github.com/1837620622 · 二次开发: 传康KK" data-en="GitHub: github.com/1837620622 · Dev: ChuanKang KK">GitHub: github.com/1837620622 · 二次开发: 传康KK</div>
       </div>
     </div>

@@ -453,12 +453,82 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       return { content: [{ type: 'text', text: '用户取消了对话' }] };
     }
     
-    return { 
-      content: [{ 
-        type: 'text', 
-        text: res.userInput ? `用户回复: ${res.userInput}` : '用户选择继续' 
-      }] 
-    };
+    // 构建返回内容
+    const contentItems = [];
+    
+    // 处理用户上传的图片
+    if (res.images && Array.isArray(res.images) && res.images.length > 0) {
+      for (let i = 0; i < res.images.length; i++) {
+        const img = res.images[i];
+        // 添加图片内容（使用 MCP 标准的 image 类型）
+        contentItems.push({
+          type: 'image',
+          data: img.base64 || img.data,
+          mimeType: img.mimeType || 'image/png'
+        });
+        // 添加图片说明
+        contentItems.push({
+          type: 'text',
+          text: `[图片 ${i + 1}: ${img.name || img.fileName || 'image.png'}]`
+        });
+      }
+    }
+    
+    // 处理用户上传的其他文件
+    if (res.files && Array.isArray(res.files) && res.files.length > 0) {
+      for (let i = 0; i < res.files.length; i++) {
+        const file = res.files[i];
+        const fileName = file.name || 'file';
+        const filePath = file.path || '';
+        const fileSize = file.size ? formatFileSize(file.size) : '未知大小';
+        
+        // 如果文件有 base64 数据，尝试解析为文本内容
+        if (file.base64) {
+          try {
+            // 尝试将 base64 解码为文本
+            const content = Buffer.from(file.base64, 'base64').toString('utf-8');
+            // 检查是否为有效文本（非二进制）
+            const isBinaryContent = /[\x00-\x08\x0E-\x1F]/.test(content.slice(0, 1000));
+            if (!isBinaryContent && content.length > 0) {
+              // 文本文件：显示内容
+              const preview = content.length > 2000 
+                ? content.slice(0, 2000) + '\n...[内容已截断]' 
+                : content;
+              contentItems.push({
+                type: 'text',
+                text: `[文件 ${i + 1}: ${fileName}] (${fileSize})\n\`\`\`\n${preview}\n\`\`\``
+              });
+            } else {
+              // 二进制文件：只显示信息
+              contentItems.push({
+                type: 'text',
+                text: `[文件 ${i + 1}: ${fileName}] (${fileSize}) - 二进制文件${filePath ? '\n路径: ' + filePath : ''}`
+              });
+            }
+          } catch (e) {
+            // 解码失败，显示文件信息
+            contentItems.push({
+              type: 'text',
+              text: `[文件 ${i + 1}: ${fileName}] (${fileSize})${filePath ? '\n路径: ' + filePath : ''}`
+            });
+          }
+        } else if (filePath) {
+          // 只有路径的文件
+          contentItems.push({
+            type: 'text',
+            text: `[文件 ${i + 1}: ${fileName}]\n路径: ${filePath}`
+          });
+        }
+      }
+    }
+    
+    // 添加用户文本回复
+    contentItems.push({ 
+      type: 'text', 
+      text: res.userInput ? `用户回复: ${res.userInput}` : '用户选择继续' 
+    });
+    
+    return { content: contentItems };
   }
 
   // --------------------------------------------------
@@ -568,6 +638,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
     // 统计文件类型
     const imageFiles = filesData.filter(f => f.type === 'image');
+    const documentFiles = filesData.filter(f => f.type === 'document');
     const textFiles = filesData.filter(f => f.type === 'text');
 
     try {
@@ -576,11 +647,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         type: 'ask_continue',
         subType: 'analyze_files',
         requestId,
-        reason: `文件分析请求: 共 ${filesData.length} 个文件 (图片: ${imageFiles.length}, 文本: ${textFiles.length})`,
+        reason: `文件分析请求: 共 ${filesData.length} 个文件 (图片: ${imageFiles.length}, 文档: ${documentFiles.length}, 文本: ${textFiles.length})`,
         files: filesData,
         summary: {
           total: filesData.length,
           images: imageFiles.length,
+          documents: documentFiles.length,
           texts: textFiles.length
         },
         question: args.question || '请分析这些文件的内容'
@@ -605,7 +677,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     // 添加文件摘要信息
     contentItems.push({
       type: 'text',
-      text: `文件分析摘要:\n- 总文件数: ${filesData.length}\n- 图片文件: ${imageFiles.length}\n- 文本文件: ${textFiles.length}`
+      text: `文件分析摘要:\n- 总文件数: ${filesData.length}\n- 图片文件: ${imageFiles.length}\n- 文档文件: ${documentFiles.length}\n- 文本文件: ${textFiles.length}`
     });
 
     // 添加图片内容
@@ -621,6 +693,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       });
     }
 
+    // 添加文档文件信息（PDF、Word、Excel、PPT 等二进制文档）
+    for (const doc of documentFiles) {
+      contentItems.push({
+        type: 'text',
+        text: `[${doc.typeDescription}] ${doc.fileName} (${formatFileSize(doc.size)}) - 已上传`
+      });
+    }
+
     // 添加文本文件内容摘要
     for (const txt of textFiles) {
       const preview = txt.content.length > 500 
@@ -628,7 +708,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         : txt.content;
       contentItems.push({
         type: 'text',
-        text: `[文本] ${txt.fileName} (${formatFileSize(txt.size)}):\n${preview}`
+        text: `[${txt.typeDescription || '文本'}] ${txt.fileName} (${formatFileSize(txt.size)}):\n${preview}`
       });
     }
 
